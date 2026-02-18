@@ -432,12 +432,12 @@
     <script>
         // --- SUPABASE CONFIGURATION ---
         // TODO: REPLACE THESE WITH YOUR OWN SUPABASE PROJECT DETAILS
-        const SUPABASE_URL = 'ifgeypqdbpfeucyabmsq'; 
+        const SUPABASE_URL = 'https://ifgeypqdbpfeucyabmsq.supabase.co'; 
         const SUPABASE_KEY = 'sb_publishable_bdd3ZUjgL1iib8mDKp6T3Q_m1Ybc6ct';
 
         let supabaseClient = null;
         try {
-            if(SUPABASE_URL !== 'ifgeypqdbpfeucyabmsq') {
+            if(SUPABASE_URL !== 'https://ifgeypqdbpfeucyabmsq.supabase.co') {
                 supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
             }
         } catch(e) { console.error("Supabase Init Error", e); }
@@ -1181,3 +1181,4 @@
     </script>
 </body>
 </html>
+
