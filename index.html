@@ -31,16 +31,16 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
 
     <!-- Supabase (โหลดก่อนใช้งาน และใช้ defer) -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <script defer>
-        document.addEventListener("DOMContentLoaded", function () {
-            window.sb = window.supabase.createClient(
-                "https://ifgeyqdbpfeucyabmsq.supabase.co",
-                "sb_publishable_bdd3ZUjgL1iib8mDKp6T3Q_m1Ybc6ct"
-            );
-        });
-    </script>
+<script>
+const supabase = window.supabase.createClient(
+  "https://ifgeypqdbpfeucyabmsq.supabase.co",
+  "sb_publishable_bdd3ZUjgL1iib8mDKp6T3Q_m1Ybc6ct"
+);
+</script>
+	
+
 </head>
 
 <body class="flex h-screen overflow-hidden">
