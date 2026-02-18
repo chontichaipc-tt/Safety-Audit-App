@@ -95,7 +95,7 @@
 <script>
 const { createClient } = window.supabase;
 
-const supabaseClient = createClient(
+const supabase = createClient(
   "https://ifgeyqdbpfeucyabmsq.supabase.co",
   "sb_publishable_bdd3ZUjgL1iib8mDKp6T3Q_m1Ybc6ct"
 );
@@ -538,7 +538,7 @@ const supabaseClient = createClient(
 
        window.onload = async function () {
 
-    const { data, error } = await supabaseClient
+    const { data, error } = await supabase
         .from('Audits')
         .select('*')
         .eq('id', 'main')
@@ -951,7 +951,7 @@ const supabaseClient = createClient(
 
         async function saveSystem(silent) {
 
-    const { error } = await supabaseClient
+    const { error } = await supabase
         .from('Audits')
         .upsert(
             {
