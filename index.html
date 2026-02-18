@@ -1,14 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<script>
-const supabase = window.supabase.createClient(
-  "https://ifgeyqdbpfeucyabmsq.supabase.co",
-  "sb_publishable_bdd3ZUjgL1iib8mDKp6T3Q_m1Ybc6ct"
-);
-</script>
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -98,6 +89,15 @@ const supabase = window.supabase.createClient(
         header { padding-top: env(safe-area-inset-top); height: calc(4rem + env(safe-area-inset-top)); }
         aside { padding-top: env(safe-area-inset-top); }
     </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+const supabase = window.supabase.createClient(
+  "https://ifgeyqdbpfeucyabmsq.supabase.co",
+  "sb_publishable_bdd3ZUjgL1iib8mDKp6T3Q_m1Ybc6ct"
+);
+</script>
+
 </head>
 <body class="flex h-screen overflow-hidden">
 
@@ -532,12 +532,22 @@ const supabase = window.supabase.createClient(
         let scoreChart = null, defectChart = null;
         let autoSaveTimer = null;
 
-        window.onload = function() {
-            const saved = localStorage.getItem('safetyAuditSystem');
-            if(saved) systemData = JSON.parse(saved);
-            renderGlobalDashboard();
-            checkIOS();
-        }
+       window.onload = async function () {
+
+    const { data } = await supabase
+        .from('Audits')
+        .select('*')
+        .eq('id', 'main')
+        .single();
+
+    if (data) {
+        systemData = data.data;
+    }
+
+    renderGlobalDashboard();
+    checkIOS();
+}
+
 
         // --- iOS Detection ---
         function checkIOS() {
@@ -935,10 +945,26 @@ const supabase = window.supabase.createClient(
             autoSaveTimer = setTimeout(()=>saveSystem(true), 1000);
         }
 
-        function saveSystem(silent) {
-            localStorage.setItem('safetyAuditSystem', JSON.stringify(systemData));
-            if(!silent) showToast("System Saved");
-        }
+        async function saveSystem(silent) {
+
+    const { error } = await supabase
+        .from('Audits')
+        .upsert(
+            {
+                id: 'main',        // ใช้ id เดียวตลอด
+                data: systemData
+            },
+            { onConflict: 'id' }
+        );
+
+    if (error) {
+        console.error(error);
+        showToast("Cloud Save Failed");
+    } else {
+        if (!silent) showToast("Saved to Cloud");
+    }
+}
+
 
         function populateCatSelect() {
             const s = document.getElementById('defect-category'); s.innerHTML='';
