@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Site Safety Audit System (iOS Ready)</title>
+    
+    <!-- iOS PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Safety Audit">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1035/1035689.png"> 
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- HTML2PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <!-- SheetJS for CSV Import -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            red: '#E30613', 
+                            dark: '#111827',
+                            gray: '#F3F4F6',
+                            light: '#FFFFFF'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { 
+            background-color: #F9FAFB; 
+            color: #1F2937; 
+            /* iOS Safe Area Support */
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        
+        .sidebar { background-color: #FFFFFF; border-right: 1px solid #E5E7EB; }
+        .nav-item { color: #4B5563; }
+        .nav-item:hover { background-color: #F3F4F6; color: #111827; }
+        .nav-item.active { background-color: #FEF2F2; color: #E30613; border-left: 3px solid #E30613; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 10px; }
+        
+        /* Image Preview */
+        .img-preview { width: 100%; height: 140px; object-fit: cover; border-radius: 6px; border: 1px solid #E5E7EB; display: none; background-color: #F9FAFB; }
+        .img-preview.show { display: block; }
+        
+        /* Print Styles */
+        .pdf-image { width: 100px; height: 75px; object-fit: cover; margin: 0 auto; display: block; border: 1px solid #ddd; }
+        
+        /* Toast */
+        #toast { position: fixed; top: 20px; right: 20px; z-index: 60; transform: translateY(-100px); transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        #toast.show { transform: translateY(0); top: calc(20px + env(safe-area-inset-top)); }
+
+        /* Card Hover */
+        .hover-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); }
+
+        /* iOS Inputs: Prevent Zoom */
+        @media screen and (max-width: 768px) {
+            input, select, textarea { font-size: 16px !important; }
+        }
+        
+        /* Header Safe Area */
+        header { padding-top: env(safe-area-inset-top); height: calc(4rem + env(safe-area-inset-top)); }
+        aside { padding-top: env(safe-area-inset-top); }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+
+    <!-- Toast Notification -->
+    <div id="toast" class="bg-gray-900 text-white px-6 py-3 rounded-lg shadow-xl flex items-center gap-3 border-l-4 border-brand-red">
+        <i class="fas fa-info-circle text-brand-red"></i> <span id="toast-msg" class="font-medium text-sm">Notification</span>
+    </div>
+
+    <!-- Sidebar -->
+    <aside class="w-72 sidebar flex flex-col fixed md:relative h-full z-30 transform -translate-x-full md:translate-x-0 transition-transform duration-300 shadow-xl md:shadow-none" id="sidebar">
+        <div class="h-20 flex items-center justify-center border-b border-gray-100 cursor-pointer bg-white" onclick="goHome()">
+            <div class="flex items-center gap-2">
+                <div class="bg-brand-red text-white p-2 rounded-lg"><i class="fas fa-hard-hat text-xl"></i></div>
+                <div>
+                    <h1 class="text-lg font-bold text-gray-900 leading-tight">SAFETY <span class="text-brand-red">MATTERS</span></h1>
+                    <div class="text-[10px] text-gray-400 font-medium uppercase tracking-widest">Audit System</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Global Menu -->
+        <div id="menu-global" class="flex-1 overflow-y-auto py-6 px-4">
+            <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-2">Main Menu</div>
+            <a href="#" onclick="goHome()" class="nav-item active flex items-center p-3 rounded-lg mb-1 font-medium transition">
+                <i class="fas fa-globe w-5 text-center mr-3"></i> Global Overview
+            </a>
+            
+            <!-- iOS Install Button (Visible only on JS check) -->
+            <div id="ios-install-btn" class="hidden mt-4">
+                <button onclick="showIOSInstallGuide()" class="w-full flex items-center p-3 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition font-medium text-sm">
+                    <i class="fab fa-apple w-5 text-center mr-3 text-lg"></i> Install App (iOS)
+                </button>
+            </div>
+        </div>
+
+        <!-- Project Menu -->
+        <div id="menu-project" class="flex-1 overflow-y-auto py-6 px-4 hidden">
+            <button onclick="goHome()" class="mb-6 text-sm text-gray-500 hover:text-brand-red flex items-center px-2 transition font-medium group">
+                <i class="fas fa-arrow-left mr-2 group-hover:-translate-x-1 transition-transform"></i> Back to Global
+            </button>
+            
+            <div class="bg-red-50 rounded-xl p-4 mb-6 border border-red-100">
+                <div class="text-[10px] font-bold text-brand-red uppercase mb-1">Active Project</div>
+                <div class="font-bold text-gray-900 truncate" id="sidebar-project-name">Project Name</div>
+                <div class="text-xs text-gray-500 mt-1 flex items-center"><i class="far fa-calendar-alt mr-2"></i> <span id="sidebar-project-date">-</span></div>
+            </div>
+
+            <div class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3 px-2">Project Tools</div>
+            <nav class="space-y-1">
+                <a href="#" onclick="showPage('dashboard')" id="nav-dashboard" class="nav-item flex items-center p-3 rounded-lg transition font-medium"><i class="fas fa-chart-pie w-5 text-center mr-3"></i> Dashboard</a>
+                <a href="#" onclick="showPage('checklist')" id="nav-checklist" class="nav-item flex items-center p-3 rounded-lg transition font-medium"><i class="fas fa-clipboard-check w-5 text-center mr-3"></i> Checklist Form</a>
+                <a href="#" onclick="showPage('defects')" id="nav-defects" class="nav-item flex items-center p-3 rounded-lg transition font-medium"><i class="fas fa-camera w-5 text-center mr-3"></i> Defect List</a>
+                <a href="#" onclick="showPage('settings')" id="nav-settings" class="nav-item flex items-center p-3 rounded-lg transition font-medium"><i class="fas fa-sliders-h w-5 text-center mr-3"></i> Settings</a>
+            </nav>
+        </div>
+        
+        <div class="p-4 border-t border-gray-100">
+            <div class="flex items-center justify-between text-xs text-gray-400">
+                <span>v6.0 iOS Ready</span>
+                <span class="text-green-500 flex items-center gap-1"><i class="fas fa-circle text-[6px]"></i> Online</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-screen overflow-hidden bg-gray-50 relative">
+        <!-- Header Mobile -->
+        <header class="bg-white shadow-sm flex items-center justify-between px-4 md:hidden z-10 sticky top-0">
+            <button onclick="document.getElementById('sidebar').classList.toggle('-translate-x-full')" class="text-gray-500 focus:outline-none p-2 rounded-lg hover:bg-gray-100">
+                <i class="fas fa-bars fa-lg"></i>
+            </button>
+            <h1 class="text-base font-bold text-gray-800">SAFETY MATTERS</h1>
+            <div class="w-8"></div>
+        </header>
+
+        <!-- Content Body -->
+        <div class="flex-1 overflow-x-hidden overflow-y-auto p-4 md:p-8" id="main-container">
+            
+            <!-- 0. GLOBAL OVERVIEW PAGE -->
+            <div id="home-page" class="page-content block fade-in max-w-7xl mx-auto">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-8 gap-4">
+                    <div>
+                        <h2 class="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">Global Overview</h2>
+                        <p class="text-gray-500 mt-1 text-sm md:text-base">Manage all safety audit reports and performance.</p>
+                    </div>
+                    <div class="flex flex-wrap gap-2 w-full md:w-auto">
+                        <input type="file" id="csv-import" class="hidden" accept=".csv,.xlsx" onchange="handleCSVImport(this)">
+                        <button onclick="document.getElementById('csv-import').click()" class="flex-1 md:flex-none text-sm bg-white border border-gray-300 text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-50 shadow-sm transition font-medium flex items-center justify-center gap-2">
+                            <i class="fas fa-file-csv text-green-600"></i> Import
+                        </button>
+                        <button onclick="createNewProject()" class="flex-1 md:flex-none text-sm bg-brand-red text-white px-5 py-2.5 rounded-xl hover:bg-red-700 shadow-md shadow-red-200 transition font-bold flex items-center justify-center gap-2">
+                            <i class="fas fa-plus"></i> New Audit
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Global Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-8">
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-5 hover-card transition">
+                        <div class="w-12 h-12 rounded-full bg-gray-900 text-white flex items-center justify-center text-xl"><i class="fas fa-folder"></i></div>
+                        <div>
+                            <div class="text-gray-500 text-xs font-bold uppercase tracking-wide">Total Projects</div>
+                            <div class="text-3xl font-bold text-gray-900" id="global-total-projects">0</div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-5 hover-card transition">
+                        <div class="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-xl"><i class="fas fa-exclamation-triangle"></i></div>
+                        <div>
+                            <div class="text-gray-500 text-xs font-bold uppercase tracking-wide">Open Defects</div>
+                            <div class="text-3xl font-bold text-gray-900" id="global-total-defects">0</div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-5 hover-card transition">
+                        <div class="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xl"><i class="fas fa-chart-line"></i></div>
+                        <div>
+                            <div class="text-gray-500 text-xs font-bold uppercase tracking-wide">Avg. Score</div>
+                            <div class="text-3xl font-bold text-gray-900" id="global-avg-score">0%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Projects Table -->
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div class="px-4 md:px-6 py-5 border-b border-gray-100 bg-white flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div class="flex items-center gap-3">
+                            <h3 class="font-bold text-gray-800 text-lg">Audit History</h3>
+                            <button onclick="resetSystem()" class="text-xs text-red-500 hover:text-red-700 underline md:hidden">Reset All</button>
+                        </div>
+                        
+                        <!-- Search & Filter -->
+                        <div class="flex gap-2 w-full md:w-auto items-center">
+                            <button onclick="resetSystem()" class="text-xs text-red-500 hover:text-red-700 underline hidden md:inline-block mr-4">Reset All Data</button>
+                            <div class="relative flex-1 md:w-64">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                                    <i class="fas fa-search"></i>
+                                </span>
+                                <input type="text" id="history-search" onkeyup="renderGlobalDashboard()" placeholder="Search..." class="w-full border-gray-200 rounded-lg pl-10 pr-4 py-2 text-sm focus:border-brand-red focus:ring-red-200 transition outline-none">
+                            </div>
+                            <select id="history-sort" onchange="renderGlobalDashboard()" class="border-gray-200 rounded-lg py-2 pl-3 pr-8 text-sm focus:border-brand-red focus:ring-red-200 transition outline-none bg-white text-gray-700">
+                                <option value="date-desc">Newest</option>
+                                <option value="date-asc">Oldest</option>
+                                <option value="score-asc">Low Score</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-100">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase w-32">Date</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Project</th>
+                                    <th class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase w-24">Score</th>
+                                    <th class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase w-24">Defects</th>
+                                    <th class="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase w-32">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="project-list-body" class="bg-white divide-y divide-gray-50 text-sm"></tbody>
+                        </table>
+                    </div>
+                    <div id="no-projects-msg" class="p-16 text-center">
+                        <div class="bg-gray-50 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4 text-gray-300 text-4xl"><i class="fas fa-folder-open"></i></div>
+                        <h3 class="text-gray-900 font-bold">No Audit Records</h3>
+                        <p class="text-gray-400 mt-1">Start by importing a CSV or creating a new audit.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 1. PROJECT DASHBOARD -->
+            <div id="dashboard-page" class="page-content hidden max-w-7xl mx-auto">
+                <div class="flex justify-between items-center mb-8">
+                    <div>
+                        <div class="flex items-center gap-2 text-sm text-gray-500 mb-1"><i class="fas fa-folder"></i> Project Overview</div>
+                        <h2 class="text-2xl md:text-3xl font-bold text-gray-900"><span class="current-project-name text-brand-red">Untitled</span></h2>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                        <div class="text-xs text-gray-500 uppercase font-bold mb-2">Safety Score</div>
+                        <div class="flex items-end justify-between">
+                            <div class="text-4xl font-bold text-brand-red" id="dash-score">0%</div>
+                            <div class="h-1.5 w-24 bg-gray-100 rounded-full mb-2"><div id="dash-score-bar" class="h-1.5 bg-brand-red rounded-full" style="width:0%"></div></div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                        <div class="text-xs text-gray-500 uppercase font-bold mb-2">Total Defects</div>
+                        <div class="text-3xl font-bold text-gray-900" id="dash-defects">0</div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                        <div class="text-xs text-gray-500 uppercase font-bold mb-2">Open Issues</div>
+                        <div class="text-3xl font-bold text-red-600" id="dash-open">0</div>
+                    </div>
+                    <div class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+                        <div class="text-xs text-gray-500 uppercase font-bold mb-2">Resolved</div>
+                        <div class="text-3xl font-bold text-green-600" id="dash-closed">0</div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                        <h3 class="font-bold text-gray-800 mb-6 text-sm uppercase flex items-center gap-2"><i class="fas fa-chart-pie text-gray-400"></i> Compliance Ratio</h3>
+                        <div class="h-64 flex justify-center"><canvas id="scoreChart"></canvas></div>
+                    </div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                        <h3 class="font-bold text-gray-800 mb-6 text-sm uppercase flex items-center gap-2"><i class="fas fa-chart-bar text-gray-400"></i> Defects by Category</h3>
+                        <div class="h-64 flex justify-center"><canvas id="defectChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. CHECKLIST PAGE -->
+            <div id="checklist-page" class="page-content hidden max-w-5xl mx-auto">
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-200 mb-6 sticky top-0 z-20">
+                    <div class="p-4 md:p-6 border-b border-gray-100 flex justify-between items-center bg-white rounded-t-2xl">
+                        <div>
+                            <h2 class="text-xl font-bold text-gray-800">Checklist Form</h2>
+                            <p class="text-xs text-green-600 mt-1 flex items-center gap-1"><i class="fas fa-check-circle"></i> Auto-saved</p>
+                        </div>
+                        <button onclick="exportChecklistPDF()" class="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 shadow-sm transition"><i class="fas fa-file-pdf mr-2"></i> Export PDF</button>
+                    </div>
+
+                    <div class="p-6 bg-gray-50 border-b border-gray-100">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                            <div class="space-y-1"><label class="text-xs font-bold text-gray-500 uppercase">Location / Project</label><input type="text" id="proj-location" class="w-full border-gray-300 rounded-lg p-2.5 text-base md:text-sm focus:border-brand-red focus:ring-red-200 transition" onchange="autoSave()"></div>
+                            <div class="space-y-1"><label class="text-xs font-bold text-gray-500 uppercase">Group</label><input type="text" id="proj-group" class="w-full border-gray-300 rounded-lg p-2.5 text-base md:text-sm focus:border-brand-red focus:ring-red-200 transition" onchange="autoSave()"></div>
+                            <div class="space-y-1"><label class="text-xs font-bold text-gray-500 uppercase">Date</label><input type="date" id="proj-date" class="w-full border-gray-300 rounded-lg p-2.5 text-base md:text-sm focus:border-brand-red focus:ring-red-200 transition" onchange="autoSave()"></div>
+                            <div class="space-y-1"><label class="text-xs font-bold text-gray-500 uppercase">Project Manager</label><input type="text" id="proj-pm" class="w-full border-gray-300 rounded-lg p-2.5 text-base md:text-sm focus:border-brand-red focus:ring-red-200 transition" onchange="autoSave()"></div>
+                            <div class="space-y-1"><label class="text-xs font-bold text-blue-600 uppercase">Safety Auditor</label><input type="text" id="proj-auditor" class="w-full border-blue-200 bg-blue-50 rounded-lg p-2.5 text-base md:text-sm focus:border-blue-500 focus:ring-blue-100 transition" onchange="autoSave()"></div>
+                        </div>
+                    </div>
+                    <div id="checklist-container" class="p-6 space-y-6"></div>
+                </div>
+            </div>
+
+            <!-- 3. DEFECTS PAGE -->
+            <div id="defects-page" class="page-content hidden max-w-6xl mx-auto">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900">Defect List</h2>
+                    <div class="flex gap-2">
+                        <button onclick="openDefectModal()" class="bg-brand-red text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-red-700 transition"><i class="fas fa-plus mr-2"></i> Add Defect</button>
+                        <button onclick="exportReportPDF()" class="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-900 transition"><i class="fas fa-file-pdf mr-2"></i> Report PDF</button>
+                    </div>
+                </div>
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                    <table class="min-w-full divide-y divide-gray-100">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">No.</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Description / Category</th>
+                                <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase">Location / Resp.</th>
+                                <th class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase">Evidence</th>
+                                <th class="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase">Status</th>
+                                <th class="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="defects-table-body" class="bg-white divide-y divide-gray-50 text-sm"></tbody>
+                    </table>
+                    <div id="defects-empty" class="p-16 text-center">
+                        <div class="bg-green-50 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4 text-green-500 text-2xl"><i class="fas fa-check"></i></div>
+                        <h3 class="text-gray-900 font-bold">No Defects Found</h3>
+                        <p class="text-gray-400 text-sm mt-1">Good job! Or click 'Add Defect' to record a new issue.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. SETTINGS PAGE -->
+            <div id="settings-page" class="page-content hidden max-w-3xl mx-auto">
+                <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+                    <h2 class="text-xl font-bold text-gray-900 mb-6 pb-4 border-b">Master Data Settings</h2>
+                    <div class="mb-6">
+                        <h3 class="font-bold text-gray-700 mb-3 text-sm uppercase">Manage Checklist Topics</h3>
+                        <div class="flex gap-2 mb-4">
+                            <select id="edit-category-select" class="border-gray-300 rounded-lg text-base md:text-sm p-2.5 flex-1"></select>
+                            <input type="text" id="new-topic-input" class="border-gray-300 rounded-lg flex-1 text-base md:text-sm p-2.5" placeholder="Enter new topic...">
+                            <button onclick="addNewTopic()" class="bg-green-600 text-white px-5 rounded-lg text-sm font-bold shadow-sm hover:bg-green-700">Add</button>
+                        </div>
+                        <div id="settings-topic-list" class="h-80 overflow-y-auto border border-gray-200 rounded-xl p-4 bg-gray-50 space-y-2"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Defect Modal -->
+    <div id="defect-modal" class="fixed inset-0 bg-black bg-opacity-60 hidden overflow-y-auto h-full w-full z-50 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden transform transition-all">
+            <div class="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                <h3 class="text-lg font-bold text-gray-900">Record Defect</h3>
+                <button onclick="closeDefectModal()" class="text-gray-400 hover:text-gray-600 transition"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            <div class="p-6 space-y-5">
+                <input type="hidden" id="defect-id">
+                <div class="grid grid-cols-2 gap-5">
+                    <div>
+                        <label class="text-xs font-bold text-gray-500 uppercase block mb-1">Category</label>
+                        <select id="defect-category" class="w-full border-gray-300 rounded-lg p-2.5 text-base md:text-sm"></select>
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-500 uppercase block mb-1">Status</label>
+                        <select id="defect-status" class="w-full border-gray-300 rounded-lg p-2.5 text-base md:text-sm">
+                            <option value="Open">🔴 Open</option>
+                            <option value="Closed">🟢 Closed</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase block mb-1">Description</label>
+                    <textarea id="defect-desc" class="w-full border-gray-300 rounded-lg p-2.5 text-base md:text-sm" rows="3" placeholder="Describe the issue..."></textarea>
+                </div>
+                <div class="grid grid-cols-3 gap-5">
+                    <div><label class="text-xs font-bold text-gray-500 uppercase block mb-1">Location</label><input type="text" id="defect-location" class="w-full border-gray-300 rounded-lg p-2.5 text-base md:text-sm"></div>
+                    <div><label class="text-xs font-bold text-gray-500 uppercase block mb-1">Responsibility</label><input type="text" id="defect-resp" class="w-full border-gray-300 rounded-lg p-2.5 text-base md:text-sm"></div>
+                    <div><label class="text-xs font-bold text-gray-500 uppercase block mb-1">Due Date</label><input type="date" id="defect-duedate" class="w-full border-gray-300 rounded-lg p-2.5 text-base md:text-sm"></div>
+                </div>
+                
+                <div class="border-t pt-4">
+                    <label class="text-xs font-bold text-gray-400 uppercase block mb-3">Evidence Photos</label>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-50 p-4 rounded-xl border border-dashed border-gray-300 text-center cursor-pointer hover:border-red-400 transition" onclick="document.getElementById('input-before').click()">
+                            <div class="text-xs font-bold text-red-500 mb-2">Before</div>
+                            <input type="file" id="input-before" accept="image/*" class="hidden" onchange="handleImg(this, 'preview-before', 'hidden-before')">
+                            <img id="preview-before" class="img-preview mx-auto mb-2">
+                            <input type="hidden" id="hidden-before">
+                            <div id="ph-before" class="text-gray-400 text-xs py-2"><i class="fas fa-camera text-lg mb-1"></i><br>Upload</div>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-xl border border-dashed border-gray-300 text-center cursor-pointer hover:border-green-400 transition" onclick="document.getElementById('input-after').click()">
+                            <div class="text-xs font-bold text-green-500 mb-2">After</div>
+                            <input type="file" id="input-after" accept="image/*" class="hidden" onchange="handleImg(this, 'preview-after', 'hidden-after')">
+                            <img id="preview-after" class="img-preview mx-auto mb-2">
+                            <input type="hidden" id="hidden-after">
+                            <div id="ph-after" class="text-gray-400 text-xs py-2"><i class="fas fa-camera text-lg mb-1"></i><br>Upload</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-5 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
+                <button onclick="closeDefectModal()" class="px-5 py-2.5 border border-gray-300 bg-white text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
+                <button onclick="saveDefect()" class="px-5 py-2.5 bg-brand-red text-white rounded-lg text-sm font-bold shadow-md hover:bg-red-700 transition">Save Defect</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- IOS Install Guide Modal -->
+    <div id="ios-guide-modal" class="fixed inset-0 bg-black bg-opacity-80 hidden flex items-center justify-center p-6 z-50 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl w-full max-w-sm overflow-hidden p-6 text-center shadow-2xl animate-bounce-in">
+            <i class="fab fa-apple text-6xl text-gray-800 mb-4"></i>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">Install for iOS</h3>
+            <p class="text-gray-500 text-sm mb-6">Install this app on your iPhone for the best experience (Fullscreen, No address bar).</p>
+            
+            <div class="space-y-4 text-left text-sm text-gray-600 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                <div class="flex items-center gap-3">
+                    <span class="bg-brand-red text-white w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs">1</span>
+                    <span>Tap the <strong class="text-blue-600"><i class="fas fa-share-square"></i> Share</strong> button below</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="bg-brand-red text-white w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs">2</span>
+                    <span>Scroll down and tap <strong class="text-gray-900"><i class="fas fa-plus-square"></i> Add to Home Screen</strong></span>
+                </div>
+            </div>
+
+            <button onclick="document.getElementById('ios-guide-modal').classList.add('hidden')" class="mt-6 w-full py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800">Got it!</button>
+        </div>
+    </div>
+
+    <!-- Hidden Print Container -->
+    <div id="print-container" class="hidden"></div>
+
+    <script>
+        // --- ENGLISH DATA (Standard Safety Audit) ---
+        const defaultCategories = [
+            {id:1, name:"1. Personal Protective Equipment (PPE)"},
+            {id:2, name:"2. Cranes & Lifting Equipment"},
+            {id:3, name:"3. Electrical Safety"},
+            {id:4, name:"4. Scaffolding"},
+            {id:5, name:"5. Barricades & Restricted Areas"},
+            {id:6, name:"6. Warning Signs & Signals"},
+            {id:7, name:"7. Housekeeping & Storage"},
+            {id:8, name:"8. Fire Prevention"},
+            {id:9, name:"9. Environment Control"},
+            {id:10, name:"10. Occupational Health & Hygiene"},
+            {id:11, name:"11. General Security"},
+            {id:12, name:"12. Recommendations"}
+        ];
+        
+        const defaultTopics = [
+            // 1. PPE
+            {id:101, catId:1, text:"Proper safety helmets worn at all times."},
+            {id:102, catId:1, text:"Safety goggles/face shields used for welding/cutting."},
+            {id:103, catId:1, text:"Ear plugs/muffs used in high noise areas."},
+            {id:104, catId:1, text:"Safety belts/harnesses used for work at height (>2m)."},
+            {id:105, catId:1, text:"Proper attire (No slippers, no shorts)."},
+            // 2. Cranes
+            {id:201, catId:2, text:"Crane inspection certificate (Phor Jor 2) available."},
+            {id:202, catId:2, text:"Operator has valid license."},
+            {id:203, catId:2, text:"Lifting gear (slings, hooks) in good condition."},
+            // 3. Electrical
+            {id:301, catId:3, text:"Machinery grounded/earthed properly."},
+            {id:302, catId:3, text:"Wires/Cables in good condition (no exposed wires)."},
+            {id:303, catId:3, text:"Industrial plugs used (no domestic plugs)."},
+            {id:304, catId:3, text:"Temporary switchboards raised/covered/weatherproof."},
+            // 4. Scaffolding
+            {id:401, catId:4, text:"Scaffold structure stable and braced."},
+            {id:402, catId:4, text:"Base plates/Sole plates used properly."},
+            {id:403, catId:4, text:"Platforms fully planked without gaps."},
+            // 5. Barricades
+            {id:501, catId:5, text:"Standard guardrails installed at edges/openings."},
+            {id:502, catId:5, text:"Restricted areas clearly barricaded."},
+            // 6. Signs
+            {id:601, catId:6, text:"Warning signs displayed in hazardous areas."},
+            // 7. Housekeeping
+            {id:701, catId:7, text:"Work area clean and tidy (5S implementation)."},
+            {id:702, catId:7, text:"Materials stacked safely and organized."},
+            // 8. Fire
+            {id:801, catId:8, text:"Fire extinguishers available and inspected."},
+            {id:802, catId:8, text:"Flammable materials stored properly."},
+            // 9. Environment
+            {id:901, catId:9, text:"Dust protection (canvas/net) installed."},
+            {id:902, catId:9, text:"Perimeter fence secure (>2m high)."},
+            // 10. Health
+            {id:1001, catId:10, text:"First aid kit available."},
+            {id:1002, catId:10, text:"Toilets clean and segregated (Male/Female)."},
+            // 11. Security
+            {id:1101, catId:11, text:"Traffic management plan implemented."},
+            {id:1102, catId:11, text:"Security guards on duty."},
+            // 12. Rec
+            {id:1201, catId:12, text:"General Recommendations / Observations"}
+        ];
+
+        let systemData = { audits: [] };
+        let appData = null;
+        let scoreChart = null, defectChart = null;
+        let autoSaveTimer = null;
+
+        window.onload = function() {
+            const saved = localStorage.getItem('safetyAuditSystem');
+            if(saved) systemData = JSON.parse(saved);
+            renderGlobalDashboard();
+            checkIOS();
+        }
+
+        // --- iOS Detection ---
+        function checkIOS() {
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+            if(isIOS && !isStandalone) {
+                document.getElementById('ios-install-btn').classList.remove('hidden');
+            }
+        }
+        function showIOSInstallGuide() {
+            document.getElementById('ios-guide-modal').classList.remove('hidden');
+        }
+
+        function showToast(msg) {
+            document.getElementById('toast-msg').innerText = msg;
+            document.getElementById('toast').classList.add('show');
+            setTimeout(()=>document.getElementById('toast').classList.remove('show'), 2000);
+        }
+
+        // --- NAVIGATION ---
+        function goHome() {
+            appData = null;
+            document.querySelectorAll('.page-content').forEach(p=>p.classList.add('hidden'));
+            document.getElementById('home-page').classList.remove('hidden');
+            document.getElementById('menu-global').classList.remove('hidden');
+            document.getElementById('menu-project').classList.add('hidden');
+            if(window.innerWidth < 768) document.getElementById('sidebar').classList.add('-translate-x-full');
+            renderGlobalDashboard();
+        }
+
+        function showPage(id) {
+            document.querySelectorAll('.page-content').forEach(p=>p.classList.add('hidden'));
+            document.getElementById(id+'-page').classList.remove('hidden');
+            document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+            const nav = document.getElementById('nav-'+id);
+            if(nav) nav.classList.add('active');
+            if(id === 'dashboard') updateProjectDashboard();
+            if(window.innerWidth < 768) document.getElementById('sidebar').classList.add('-translate-x-full');
+        }
+
+        // --- GLOBAL DASHBOARD ---
+        function renderGlobalDashboard() {
+            const tbody = document.getElementById('project-list-body');
+            tbody.innerHTML = '';
+            
+            // Search & Sort Filtering
+            const search = document.getElementById('history-search')?.value.toLowerCase() || '';
+            const sort = document.getElementById('history-sort')?.value || 'date-desc';
+
+            let filtered = systemData.audits.filter(a => {
+                const text = `${a.project.location} ${a.project.group} ${a.project.pm} ${a.project.auditor}`.toLowerCase();
+                return text.includes(search);
+            });
+
+            filtered.sort((a,b) => {
+                const da = new Date(a.project.date || 0), db = new Date(b.project.date || 0);
+                const sa = calcScore(a), sb = calcScore(b);
+                if(sort === 'date-desc') return db - da;
+                if(sort === 'date-asc') return da - db;
+                if(sort === 'score-desc') return sb - sa;
+                if(sort === 'score-asc') return sa - sb;
+                return 0;
+            });
+
+            if(filtered.length === 0) {
+                if(systemData.audits.length === 0) {
+                    document.getElementById('no-projects-msg').classList.remove('hidden');
+                    document.querySelector('table').classList.add('hidden');
+                } else {
+                    document.getElementById('no-projects-msg').classList.add('hidden');
+                    document.querySelector('table').classList.remove('hidden');
+                    tbody.innerHTML = `<tr><td colspan="5" class="p-8 text-center text-gray-400">No matching records found for "${search}"</td></tr>`;
+                }
+            } else {
+                document.getElementById('no-projects-msg').classList.add('hidden');
+                document.querySelector('table').classList.remove('hidden');
+                
+                filtered.forEach(a => {
+                    const score = calcScore(a);
+                    const openDefects = a.defects ? a.defects.filter(d=>d.status=='Open').length : 0;
+                    
+                    tbody.innerHTML += `
+                        <tr class="hover:bg-gray-50 border-b border-gray-50 transition cursor-pointer" onclick="loadProject(${a.id})">
+                            <td class="px-6 py-4 text-sm text-gray-500 font-medium">${a.project.date || '-'}</td>
+                            <td class="px-6 py-4">
+                                <div class="font-bold text-gray-900">${a.project.location || 'Untitled'}</div>
+                                <div class="text-xs text-gray-400 font-medium tracking-wide uppercase">${a.project.group || ''}</div>
+                            </td>
+                            <td class="px-6 py-4 text-center"><span class="px-3 py-1 rounded-full text-xs font-bold ${score>=80?'bg-green-100 text-green-700':'bg-red-100 text-red-700'}">${score}%</span></td>
+                            <td class="px-6 py-4 text-center font-bold text-gray-600">${openDefects}</td>
+                            <td class="px-6 py-4 text-right">
+                                <button onclick="event.stopPropagation(); loadProject(${a.id})" class="text-indigo-600 hover:text-indigo-800 mr-3 transition" title="Open"><i class="fas fa-folder-open"></i></button>
+                                <button onclick="event.stopPropagation(); deleteProject(${a.id})" class="text-red-400 hover:text-red-600 transition" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                            </td>
+                        </tr>`;
+                });
+            }
+            
+            // Calc stats from ALL data, not filtered
+            let allDefects = 0, allScore = 0;
+            systemData.audits.forEach(a => {
+                allDefects += (a.defects ? a.defects.filter(d=>d.status=='Open').length : 0);
+                allScore += calcScore(a);
+            });
+            updateGlobalStats(systemData.audits.length, allDefects, systemData.audits.length ? Math.round(allScore/systemData.audits.length) : 0);
+        }
+
+        function updateGlobalStats(count, defects, score) {
+            document.getElementById('global-total-projects').innerText = count;
+            document.getElementById('global-total-defects').innerText = defects;
+            document.getElementById('global-avg-score').innerText = score + '%';
+        }
+
+        // --- PROJECT LOGIC ---
+        function createNewProject() {
+            const newId = Date.now();
+            const newAudit = {
+                id: newId,
+                project: { location: "New Project", group: "", pm: "", auditor: "", date: new Date().toISOString().split('T')[0] },
+                categories: JSON.parse(JSON.stringify(defaultCategories)),
+                topics: JSON.parse(JSON.stringify(defaultTopics)),
+                answers: {}, defects: []
+            };
+            systemData.audits.push(newAudit);
+            saveSystem();
+            loadProject(newId);
+        }
+
+        function loadProject(id) {
+            appData = systemData.audits.find(a => a.id === id);
+            if(!appData) return;
+            
+            // Switch Menu
+            document.getElementById('menu-global').classList.add('hidden');
+            document.getElementById('menu-project').classList.remove('hidden');
+            
+            // Update Sidebar Info
+            document.getElementById('sidebar-project-name').innerText = appData.project.location || 'Untitled';
+            document.getElementById('sidebar-project-date').innerText = appData.project.date;
+            document.querySelector('.current-project-name').innerText = appData.project.location || 'Untitled';
+
+            // Populate Form Inputs
+            ['location','group','pm','auditor','date'].forEach(f => {
+                const el = document.getElementById('proj-'+f);
+                if(el) el.value = appData.project[f] || '';
+            });
+
+            renderChecklist();
+            renderDefects();
+            renderSettingsList();
+            populateCatSelect();
+            showPage('dashboard');
+        }
+
+        function deleteProject(id) {
+            if(confirm("Are you sure you want to delete this audit record?")) {
+                systemData.audits = systemData.audits.filter(a => a.id !== id);
+                saveSystem();
+                renderGlobalDashboard();
+            }
+        }
+
+        function resetSystem() {
+            if(confirm("Warning: ALL DATA WILL BE DELETED. Continue?")) {
+                localStorage.removeItem('safetyAuditSystem');
+                location.reload();
+            }
+        }
+
+        // --- CHECKLIST ---
+        function renderChecklist() {
+            const div = document.getElementById('checklist-container');
+            div.innerHTML = '';
+            appData.categories.forEach(c => {
+                const topics = appData.topics.filter(t => t.catId === c.id);
+                if(!topics.length) return;
+                
+                let html = `<div class="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm mb-4">
+                    <div class="bg-gray-50 px-5 py-3 border-b border-gray-100 font-bold text-gray-700 text-sm flex justify-between cursor-pointer" onclick="this.nextElementSibling.classList.toggle('hidden')">
+                        ${c.name} <i class="fas fa-chevron-down text-gray-400"></i>
+                    </div>
+                    <div class="p-5 space-y-4">`;
+                
+                topics.forEach((t) => {
+                    const ans = appData.answers[t.id] || {status:null, comment:''};
+                    
+                    const isYes = ans.status === 'yes';
+                    const isNo = ans.status === 'no';
+                    const isNa = ans.status === 'na';
+
+                    const yesClass = isYes 
+                        ? 'bg-green-600 text-white border-green-600 shadow-md ring-2 ring-green-200' 
+                        : 'bg-white text-gray-400 border-gray-200 hover:border-green-400 hover:text-green-500 hover:bg-green-50';
+
+                    const noClass = isNo 
+                        ? 'bg-red-600 text-white border-red-600 shadow-md ring-2 ring-red-200' 
+                        : 'bg-white text-gray-400 border-gray-200 hover:border-red-400 hover:text-red-500 hover:bg-red-50';
+
+                    const naClass = isNa 
+                        ? 'bg-gray-600 text-white border-gray-600 shadow-md ring-2 ring-gray-200' 
+                        : 'bg-white text-gray-400 border-gray-200 hover:border-gray-400 hover:text-gray-600 hover:bg-gray-50';
+
+                    if(c.id === 12) {
+                        html += `<div class="mb-2"><div class="font-bold text-sm text-gray-800 mb-1">${t.text}</div><textarea class="w-full border-gray-200 rounded-lg p-3 text-base md:text-sm bg-gray-50 focus:bg-white transition" rows="3" onchange="updComment(${t.id},this.value)">${ans.comment||''}</textarea></div>`;
+                    } else {
+                        html += `
+                        <div class="border-b border-gray-100 pb-4 last:border-0">
+                            <div class="flex flex-col md:flex-row justify-between mb-3 items-start md:items-center">
+                                <div class="text-sm text-gray-700 font-medium flex-1 pr-4 leading-relaxed">${t.text}</div>
+                                <div class="flex gap-2 mt-3 md:mt-0">
+                                    <label class="cursor-pointer">
+                                        <input type="radio" name="q${t.id}" class="hidden" onchange="updAns(${t.id},'yes')" ${isYes?'checked':''}>
+                                        <div class="w-16 h-9 flex items-center justify-center rounded-lg border text-sm font-bold transition-all duration-200 transform active:scale-95 ${yesClass}">Yes</div>
+                                    </label>
+                                    <label class="cursor-pointer">
+                                        <input type="radio" name="q${t.id}" class="hidden" onchange="updAns(${t.id},'no')" ${isNo?'checked':''}>
+                                        <div class="w-16 h-9 flex items-center justify-center rounded-lg border text-sm font-bold transition-all duration-200 transform active:scale-95 ${noClass}">No</div>
+                                    </label>
+                                    <label class="cursor-pointer">
+                                        <input type="radio" name="q${t.id}" class="hidden" onchange="updAns(${t.id},'na')" ${isNa?'checked':''}>
+                                        <div class="w-16 h-9 flex items-center justify-center rounded-lg border text-sm font-bold transition-all duration-200 transform active:scale-95 ${naClass}">N/A</div>
+                                    </label>
+                                </div>
+                            </div>
+                            <input type="text" placeholder="Add comment..." value="${ans.comment||''}" onchange="updComment(${t.id},this.value)" class="w-full text-base md:text-xs border-gray-200 rounded-lg p-2 bg-gray-50 focus:bg-white focus:border-brand-red focus:ring-0 transition">
+                        </div>`;
+                    }
+                });
+                html += `</div></div>`;
+                div.innerHTML += html;
+            });
+        }
+
+        function updAns(tid, val) {
+            if(!appData.answers[tid]) appData.answers[tid] = {};
+            appData.answers[tid].status = val;
+            renderChecklist(); // Re-render for button states
+            autoSave();
+        }
+        function updComment(tid, val) {
+            if(!appData.answers[tid]) appData.answers[tid] = {};
+            appData.answers[tid].comment = val;
+            autoSave();
+        }
+
+        // --- DEFECTS ---
+        function renderDefects() {
+            const tbody = document.getElementById('defects-table-body');
+            tbody.innerHTML = '';
+            if(!appData.defects.length) {
+                document.getElementById('defects-empty').classList.remove('hidden');
+                document.querySelector('#defects-page table').classList.add('hidden');
+                return;
+            }
+            document.getElementById('defects-empty').classList.add('hidden');
+            document.querySelector('#defects-page table').classList.remove('hidden');
+            
+            appData.defects.forEach((d,i) => {
+                const cat = appData.categories.find(c=>c.id==d.categoryId)?.name.replace(/^\d+\.\s*/,'') || '-';
+                const hasImg = (d.photoBefore||d.photoAfter) ? '<span class="text-blue-500"><i class="fas fa-image"></i></span>' : '<span class="text-gray-300">-</span>';
+                const statusBadge = d.status=='Open' 
+                    ? '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Open</span>' 
+                    : '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Closed</span>';
+                
+                tbody.innerHTML += `<tr class="hover:bg-gray-50 border-b border-gray-50 transition">
+                    <td class="px-6 py-4 text-center text-gray-400 text-xs">${i+1}</td>
+                    <td class="px-6 py-4"><div class="text-xs font-bold text-brand-red uppercase mb-1">${cat}</div><div class="text-sm text-gray-800 font-medium">${d.description}</div></td>
+                    <td class="px-6 py-4 text-xs text-gray-500"><div><i class="fas fa-map-marker-alt mr-1"></i> ${d.location||'-'}</div><div><i class="fas fa-user mr-1"></i> ${d.responsibility||'-'}</div></td>
+                    <td class="px-6 py-4 text-center">${hasImg}</td>
+                    <td class="px-6 py-4 text-center">${statusBadge}</td>
+                    <td class="px-6 py-4 text-right"><button onclick="editDefect(${d.id})" class="text-indigo-600 hover:bg-indigo-50 p-2 rounded transition"><i class="fas fa-pen"></i></button><button onclick="delDefect(${d.id})" class="text-red-400 hover:bg-red-50 p-2 rounded transition"><i class="fas fa-trash"></i></button></td>
+                </tr>`;
+            });
+        }
+
+        function openDefectModal() {
+            document.getElementById('defect-id').value = '';
+            document.getElementById('defect-desc').value = '';
+            document.getElementById('defect-location').value = '';
+            document.getElementById('defect-resp').value = '';
+            document.getElementById('defect-duedate').value = '';
+            document.getElementById('preview-before').classList.remove('show');
+            document.getElementById('preview-after').classList.remove('show');
+            document.getElementById('ph-before').classList.remove('hidden');
+            document.getElementById('ph-after').classList.remove('hidden');
+            document.getElementById('defect-modal').classList.remove('hidden');
+        }
+        function closeDefectModal() { document.getElementById('defect-modal').classList.add('hidden'); }
+        
+        function editDefect(id) {
+            openDefectModal();
+            const d = appData.defects.find(x=>x.id==id);
+            document.getElementById('defect-id').value = d.id;
+            document.getElementById('defect-category').value = d.categoryId;
+            document.getElementById('defect-status').value = d.status;
+            document.getElementById('defect-desc').value = d.description;
+            document.getElementById('defect-location').value = d.location;
+            document.getElementById('defect-resp').value = d.responsibility;
+            document.getElementById('defect-duedate').value = d.dueDate;
+            if(d.photoBefore) { document.getElementById('preview-before').src=d.photoBefore; document.getElementById('preview-before').classList.add('show'); document.getElementById('hidden-before').value=d.photoBefore; document.getElementById('ph-before').classList.add('hidden'); }
+            if(d.photoAfter) { document.getElementById('preview-after').src=d.photoAfter; document.getElementById('preview-after').classList.add('show'); document.getElementById('hidden-after').value=d.photoAfter; document.getElementById('ph-after').classList.add('hidden'); }
+        }
+
+        function saveDefect() {
+            const id = document.getElementById('defect-id').value;
+            const obj = {
+                id: id ? parseInt(id) : Date.now(),
+                categoryId: parseInt(document.getElementById('defect-category').value),
+                description: document.getElementById('defect-desc').value,
+                location: document.getElementById('defect-location').value,
+                responsibility: document.getElementById('defect-resp').value,
+                dueDate: document.getElementById('defect-duedate').value,
+                status: document.getElementById('defect-status').value,
+                photoBefore: document.getElementById('hidden-before').value,
+                photoAfter: document.getElementById('hidden-after').value
+            };
+            if(id) {
+                const idx = appData.defects.findIndex(x=>x.id==id);
+                appData.defects[idx] = obj;
+            } else {
+                appData.defects.push(obj);
+            }
+            saveSystem(); renderDefects(); closeDefectModal();
+        }
+        function delDefect(id) { if(confirm("Delete this defect?")) { appData.defects = appData.defects.filter(x=>x.id!=id); saveSystem(); renderDefects(); } }
+
+        function handleImg(input, pid, hid) {
+            if(input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        const scale = 800/img.width;
+                        canvas.width = 800; canvas.height = img.height*scale;
+                        ctx.drawImage(img,0,0,canvas.width,canvas.height);
+                        const url = canvas.toDataURL('image/jpeg',0.7);
+                        document.getElementById(pid).src=url;
+                        document.getElementById(pid).classList.add('show');
+                        document.getElementById(hid).value=url;
+                        document.getElementById(pid.replace('preview','ph')).classList.add('hidden');
+                    }
+                    img.src = e.target.result;
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        // --- DASHBOARD & UTIL ---
+        function updateProjectDashboard() {
+            const score = calcScore(appData);
+            document.getElementById('dash-score').innerText = score+'%';
+            document.getElementById('dash-score-bar').style.width = score+'%';
+            document.getElementById('dash-defects').innerText = appData.defects.length;
+            document.getElementById('dash-open').innerText = appData.defects.filter(x=>x.status=='Open').length;
+            document.getElementById('dash-closed').innerText = appData.defects.filter(x=>x.status=='Closed').length;
+
+            const ctx1 = document.getElementById('scoreChart').getContext('2d');
+            if(scoreChart) scoreChart.destroy();
+            scoreChart = new Chart(ctx1, {type:'doughnut', data:{labels:['Pass','Fail'], datasets:[{data:[score,100-score], backgroundColor:['#10B981','#E30613'], borderWidth:0}]}, options:{maintainAspectRatio:false, cutout:'75%'}});
+
+            const ctx2 = document.getElementById('defectChart').getContext('2d');
+            if(defectChart) defectChart.destroy();
+            const counts = {};
+            appData.defects.forEach(d => { 
+                let n = appData.categories.find(c=>c.id==d.categoryId)?.name || 'Other';
+                n = n.replace(/^\d+\.\s*/,'').substring(0,12);
+                counts[n] = (counts[n]||0)+1;
+            });
+            defectChart = new Chart(ctx2, {type:'bar', data:{labels:Object.keys(counts), datasets:[{label:'Defects', data:Object.values(counts), backgroundColor:'#3B82F6', borderRadius:4}]}, options:{maintainAspectRatio:false, scales:{y:{beginAtZero:true},x:{grid:{display:false}}}}});
+        }
+
+        function calcScore(audit) {
+            let total=0, pass=0;
+            Object.values(audit.answers).forEach(a => { if(a.status=='yes') {pass++; total++;} else if(a.status=='no') total++; });
+            return total==0 ? 0 : Math.round((pass/total)*100);
+        }
+
+        function autoSave() {
+            if(!appData) return;
+            if(autoSaveTimer) clearTimeout(autoSaveTimer);
+            appData.project = {
+                location: document.getElementById('proj-location').value,
+                group: document.getElementById('proj-group').value,
+                pm: document.getElementById('proj-pm').value,
+                auditor: document.getElementById('proj-auditor').value,
+                date: document.getElementById('proj-date').value
+            };
+            
+            // Sidebar update
+            document.getElementById('sidebar-project-name').innerText = appData.project.location || 'Untitled';
+            document.getElementById('sidebar-project-date').innerText = appData.project.date;
+            
+            autoSaveTimer = setTimeout(()=>saveSystem(true), 1000);
+        }
+
+        function saveSystem(silent) {
+            localStorage.setItem('safetyAuditSystem', JSON.stringify(systemData));
+            if(!silent) showToast("System Saved");
+        }
+
+        function populateCatSelect() {
+            const s = document.getElementById('defect-category'); s.innerHTML='';
+            appData.categories.forEach(c => s.innerHTML+=`<option value="${c.id}">${c.name.replace(/^\d+\.\s*/,'')}</option>`);
+            
+            const s2 = document.getElementById('edit-category-select'); s2.innerHTML='';
+            appData.categories.forEach(c => s2.innerHTML+=`<option value="${c.id}">${c.name}</option>`);
+        }
+
+        function renderSettingsList() {
+            const d = document.getElementById('settings-topic-list'); d.innerHTML='';
+            appData.topics.forEach(t => {
+                const cn = appData.categories.find(c=>c.id==t.catId)?.name.replace(/^\d+\.\s*/,'');
+                d.innerHTML+=`<div class="text-xs border border-gray-200 bg-white rounded p-2 flex justify-between items-center"><span class="text-gray-600 font-bold mr-2">[${cn}]</span> <span class="flex-1 truncate">${t.text}</span> <button class="text-red-400 hover:text-red-600 ml-2" onclick="delTopic(${t.id})"><i class="fas fa-times"></i></button></div>`;
+            });
+        }
+        function addNewTopic() {
+            const cid = parseInt(document.getElementById('edit-category-select').value);
+            const txt = document.getElementById('new-topic-input').value;
+            if(txt) { appData.topics.push({id:Date.now(), catId:cid, text:txt}); renderSettingsList(); saveSystem(); }
+        }
+        function delTopic(id) { if(confirm("Remove topic?")) { appData.topics = appData.topics.filter(t=>t.id!=id); renderSettingsList(); saveSystem(); } }
+
+        // --- CSV IMPORT ---
+        function handleCSVImport(input) {
+            const file = input.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const json = XLSX.utils.sheet_to_json(sheet, {header:1}); 
+                
+                if(json.length > 1) {
+                    createNewProject(); 
+                    appData.project.location = "Imported Audit";
+                    for(let i=1; i<json.length; i++) {
+                        const row = json[i];
+                        if(!row[2]) continue;
+                        
+                        // Simple Keyword Matching for Categories
+                        let catId = 11; 
+                        const d = row[2].toString().toLowerCase();
+                        if(d.includes("electric")) catId=3;
+                        else if(d.includes("ppe") || d.includes("helmet") || d.includes("shoe")) catId=1;
+                        else if(d.includes("fire")) catId=8;
+                        else if(d.includes("crane") || d.includes("lift")) catId=2;
+                        else if(d.includes("scaffold")) catId=4;
+
+                        appData.defects.push({
+                            id: Date.now() + i,
+                            categoryId: catId,
+                            description: row[2],
+                            location: row[3] || '',
+                            responsibility: row[4] || '',
+                            dueDate: row[5] || '',
+                            status: (row[8] && row[8].toString().toLowerCase().includes('close')) ? 'Closed' : 'Open',
+                            photoBefore: '', photoAfter: ''
+                        });
+                        if(i===1 && row[1]) appData.project.date = row[1];
+                    }
+                    saveSystem(); loadProject(appData.id); showToast("Import Successful!");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // --- PDF REPORTS (Professional English) ---
+        function exportReportPDF() {
+            const el = document.getElementById('print-container');
+            let rows = '';
+            appData.defects.forEach((d,i) => {
+                let catName = appData.categories.find(c=>c.id==d.categoryId)?.name || '';
+                catName = catName.replace(/^\d+\.\s*/,'');
+                const img1 = d.photoBefore ? `<img src="${d.photoBefore}" class="pdf-image">` : '';
+                const img2 = d.photoAfter ? `<img src="${d.photoAfter}" class="pdf-image">` : '';
+                
+                rows += `
+                <tr style="border:1px solid #000; page-break-inside: avoid;">
+                    <td style="border:1px solid #000; padding:6px; text-align:center;">${i+1}</td>
+                    <td style="border:1px solid #000; padding:6px; text-align:center;">${appData.project.date}</td>
+                    <td style="border:1px solid #000; padding:6px; width:28%;">
+                        <div style="font-weight:bold; color:#E30613; margin-bottom:4px;">${catName}</div>
+                        ${d.description}
+                    </td>
+                    <td style="border:1px solid #000; padding:6px; text-align:center;">${d.location}</td>
+                    <td style="border:1px solid #000; padding:6px; text-align:center;">${d.responsibility}</td>
+                    <td style="border:1px solid #000; padding:6px; text-align:center;">${d.dueDate}</td>
+                    <td style="border:1px solid #000; padding:6px; text-align:center;">${img1}</td>
+                    <td style="border:1px solid #000; padding:6px; text-align:center;">${img2}</td>
+                    <td style="border:1px solid #000; padding:6px; text-align:center; font-weight:bold;">${d.status}</td>
+                </tr>`;
+            });
+
+            el.innerHTML = `
+                <div style="font-family: 'Sarabun', sans-serif; color: #111; padding: 20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 3px solid #E30613; padding-bottom:15px; margin-bottom:20px;">
+                        <div>
+                            <div style="font-size:24px; font-weight:bold; color:#E30613; text-transform:uppercase;">Site Safety Audit Report</div>
+                            <div style="font-size:12px; letter-spacing:1px; font-weight:bold;">SAFETY MATTERS | FRASERS PROPERTY</div>
+                        </div>
+                        <div style="text-align:right; font-size:12px; line-height:1.5;">
+                            <div><b>Project:</b> ${appData.project.location} (${appData.project.group})</div>
+                            <div><b>Manager:</b> ${appData.project.pm}</div>
+                            <div><b>Auditor:</b> ${appData.project.auditor}</div>
+                        </div>
+                    </div>
+                    <table style="width:100%; border-collapse:collapse; font-size:10px;">
+                        <tr style="background-color:#f0f0f0; font-weight:bold; text-transform:uppercase;">
+                            <th style="border:1px solid #000; padding:8px;">No.</th>
+                            <th style="border:1px solid #000; padding:8px;">Date</th>
+                            <th style="border:1px solid #000; padding:8px;">Defect Description</th>
+                            <th style="border:1px solid #000; padding:8px;">Location</th>
+                            <th style="border:1px solid #000; padding:8px;">Resp.</th>
+                            <th style="border:1px solid #000; padding:8px;">Due Date</th>
+                            <th style="border:1px solid #000; padding:8px;">Before</th>
+                            <th style="border:1px solid #000; padding:8px;">After</th>
+                            <th style="border:1px solid #000; padding:8px;">Status</th>
+                        </tr>
+                        ${rows}
+                    </table>
+                </div>
+            `;
+            
+            el.classList.remove('hidden');
+            html2pdf().set({
+                margin: 5,
+                filename: `Report_${appData.project.location}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            }).from(el).save().then(() => el.classList.add('hidden'));
+        }
+
+        function exportChecklistPDF() {
+            const el = document.getElementById('print-container');
+            let rows = '';
+            appData.categories.forEach(c => {
+                const topics = appData.topics.filter(t=>t.catId==c.id);
+                if(topics.length) {
+                    rows += `<tr style="background:#eee; font-weight:bold;"><td colspan="5" style="border:1px solid #000; padding:6px;">${c.name}</td></tr>`;
+                    topics.forEach((t,i) => {
+                        const a = appData.answers[t.id] || {};
+                        const rem = a.comment ? `<br><span style="color:#666; font-style:italic;">Note: ${a.comment}</span>` : '';
+                        const chk = val => a.status==val ? '<span style="font-family:zapfdingbats;">&#10004;</span>' : '';
+                        rows += `<tr style="page-break-inside:avoid;">
+                            <td style="border:1px solid #000; text-align:center; padding:4px;">${i+1}</td>
+                            <td style="border:1px solid #000; padding:4px;">${t.text} ${rem}</td>
+                            <td style="border:1px solid #000; text-align:center;">${chk('yes')}</td>
+                            <td style="border:1px solid #000; text-align:center;">${chk('no')}</td>
+                            <td style="border:1px solid #000; text-align:center;">${chk('na')}</td>
+                        </tr>`;
+                    });
+                }
+            });
+
+            el.innerHTML = `
+                <div style="font-family: 'Sarabun', sans-serif; padding: 25px; color:#111;">
+                    <div style="display:flex; justify-content:space-between; border-bottom:3px solid #E30613; padding-bottom:15px; margin-bottom:15px;">
+                        <div>
+                            <h1 style="font-size:22px; font-weight:bold; text-transform:uppercase;">Safety Audit Checklist</h1>
+                            <div style="font-size:12px; font-weight:bold;">SAFETY MATTERS | FRASERS PROPERTY</div>
+                        </div>
+                        <div style="text-align:right; font-size:12px; line-height:1.5;">
+                            <div><b>Project:</b> ${appData.project.location}</div>
+                            <div><b>Date:</b> ${appData.project.date}</div>
+                            <div><b>Compliance Score:</b> <span style="font-size:14px; font-weight:bold;">${calcScore(appData)}%</span></div>
+                        </div>
+                    </div>
+                    <table style="width:100%; border-collapse:collapse; font-size:11px;">
+                        <tr style="background:#ddd; font-weight:bold; text-transform:uppercase;">
+                            <th style="border:1px solid #000; width:40px; padding:6px;">No.</th>
+                            <th style="border:1px solid #000; padding:6px;">Inspection Item</th>
+                            <th style="border:1px solid #000; width:50px;">Yes</th>
+                            <th style="border:1px solid #000; width:50px;">No</th>
+                            <th style="border:1px solid #000; width:50px;">N/A</th>
+                        </tr>
+                        ${rows}
+                    </table>
+                    <div style="margin-top:30px; display:flex; justify-content:space-between; font-size:12px;">
+                        <div style="text-align:center; width:200px;">
+                            <div style="border-bottom:1px solid #000; height:30px; margin-bottom:5px;"></div>
+                            <div>Auditor Signature</div>
+                        </div>
+                        <div style="text-align:center; width:200px;">
+                            <div style="border-bottom:1px solid #000; height:30px; margin-bottom:5px;"></div>
+                            <div>Project Manager Acknowledge</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            el.classList.remove('hidden');
+            html2pdf().set({
+                margin: 10,
+                filename: `Checklist_${appData.project.location}.pdf`,
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            }).from(el).save().then(() => el.classList.add('hidden'));
+        }
+    </script>
+</body>
+</html>
