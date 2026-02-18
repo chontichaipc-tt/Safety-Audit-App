@@ -33,10 +33,10 @@
     <!-- Supabase (โหลดก่อนใช้งาน และใช้ defer) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-<script>
-const supabase = window.supabase.createClient(
-  "https://ifgeypqdbpfeucyabmsq.supabase.co",
-  "sb_publishable_bdd3ZUjgL1iib8mDKp6T3Q_m1Ybc6ct"
+    <script>
+    const supabase = window.supabase.createClient(
+       "https://ifgeypqdbpfeucyabmsq.supabase.co",
+       "sb_publishable_bdd3ZUjgL1iib8mDKp6T3Q_m1Ybc6ct"
 );
 </script>
 	
@@ -476,21 +476,40 @@ const supabase = window.supabase.createClient(
         let scoreChart = null, defectChart = null;
         let autoSaveTimer = null;
 
-       window.onload = async function () {
+       window.addEventListener("load", async () => {
 
-    const { data, error } = await supabase
-        .from('Audits')
-        .select('*')
-        .eq('id', 'main')
-        .single();
+    // 1. โหลดจาก Local ก่อน
+    const saved = localStorage.getItem('safetyAuditSystem');
 
-    if (data) {
-        systemData = data.data;
+    if (saved) {
+        systemData = JSON.parse(saved);
+        console.log("Loaded from Local");
+    } 
+    else {
+        // 2. ถ้า Local ไม่มี → ดึงจาก Cloud
+        try {
+            const { data, error } = await supabase
+                .from('Audits')
+                .select('*')
+                .eq('id', 'main')
+                .single();
+
+            if (data) {
+                systemData = data.data;
+                localStorage.setItem(
+                    'safetyAuditSystem',
+                    JSON.stringify(systemData)
+                );
+                console.log("Loaded from Cloud");
+            }
+        } catch (err) {
+            console.error("Cloud load failed");
+        }
     }
 
     renderGlobalDashboard();
     checkIOS();
-}
+};
 
 
         // --- iOS Detection ---
@@ -891,24 +910,30 @@ const supabase = window.supabase.createClient(
 
         async function saveSystem(silent) {
 
-    const { error } = await supabase
-        .from('Audits')
-        .upsert(
-            {
-                id: 'main',
-                data: systemData
-            },
-            { onConflict: 'id' }
-        );
+    // 1. Save Local ก่อน (ทันที)
+    localStorage.setItem(
+        'safetyAuditSystem',
+        JSON.stringify(systemData)
+    );
 
-    if (error) {
-        console.error(error);
-        showToast("Cloud Save Failed");
-    } else {
-        if (!silent) showToast("Saved to Cloud");
+    // 2. Backup ไป Cloud แบบเงียบ
+    try {
+        const { error } = await supabase
+            .from('Audits')
+            .upsert(
+                { id: 'main', data: systemData },
+                { onConflict: 'id' }
+            );
+
+        if (error) throw error;
+
+        if (!silent) showToast("Saved (Local + Cloud)");
+
+    } catch (err) {
+        console.error("Cloud backup failed");
+        if (!silent) showToast("Saved locally (Cloud failed)");
     }
 }
-
 
         function populateCatSelect() {
             const s = document.getElementById('defect-category'); s.innerHTML='';
@@ -1109,7 +1134,11 @@ const supabase = window.supabase.createClient(
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             }).from(el).save().then(() => el.classList.add('hidden'));
         }
-    </script>
+   window.addEventListener("online", async () => {
+    console.log("Back Online → Syncing...");
+    await saveSystem(true);
+});
+ 
+     </script>
 </body>
-
 </html>
