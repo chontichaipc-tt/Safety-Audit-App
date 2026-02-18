@@ -89,14 +89,18 @@
         header { padding-top: env(safe-area-inset-top); height: calc(4rem + env(safe-area-inset-top)); }
         aside { padding-top: env(safe-area-inset-top); }
     </style>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script>
-const supabase = window.supabase.createClient(
+const { createClient } = window.supabase;
+
+const supabaseClient = createClient(
   "https://ifgeyqdbpfeucyabmsq.supabase.co",
   "sb_publishable_bdd3ZUjgL1iib8mDKp6T3Q_m1Ybc6ct"
 );
 </script>
+
 
 </head>
 <body class="flex h-screen overflow-hidden">
@@ -534,7 +538,7 @@ const supabase = window.supabase.createClient(
 
        window.onload = async function () {
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
         .from('Audits')
         .select('*')
         .eq('id', 'main')
@@ -947,7 +951,7 @@ const supabase = window.supabase.createClient(
 
         async function saveSystem(silent) {
 
-    const { error } = await supabase
+    const { error } = await supabaseClient
         .from('Audits')
         .upsert(
             {
