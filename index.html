@@ -534,7 +534,7 @@ const supabase = window.supabase.createClient(
 
        window.onload = async function () {
 
-    const { data } = await supabase
+    const { data, error } = await supabase
         .from('Audits')
         .select('*')
         .eq('id', 'main')
@@ -951,7 +951,7 @@ const supabase = window.supabase.createClient(
         .from('Audits')
         .upsert(
             {
-                id: 'main',        // ใช้ id เดียวตลอด
+                id: 'main',
                 data: systemData
             },
             { onConflict: 'id' }
