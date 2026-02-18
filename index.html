@@ -478,7 +478,7 @@ const supabase = window.supabase.createClient(
 
        window.onload = async function () {
 
-    const { data, error } = await sb
+    const { data, error } = await supabase
         .from('Audits')
         .select('*')
         .eq('id', 'main')
@@ -891,7 +891,7 @@ const supabase = window.supabase.createClient(
 
         async function saveSystem(silent) {
 
-    const { error } = await sb
+    const { error } = await supabase
         .from('Audits')
         .upsert(
             {
